@@ -1,0 +1,22 @@
+{
+  "name": "github-backup",
+  "version": "1.0.0",
+  "description": "Backup a users's github repos to AWS S3",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "git",
+    "github",
+    "aws",
+    "s3",
+    "backup"
+  ],
+  "author": "Isaac Simmons <isaac.simmons@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "@octokit/core": "^3.2.4",
+    "aws-sdk": "^2.819.0"
+  }
+}
