@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+set -eu
+
+echo $GITHUB_ACCESS_TOKEN
