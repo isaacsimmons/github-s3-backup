@@ -7,8 +7,19 @@ import {promisify } from 'util';
 import { exec as execCallback } from 'child_process';
 import { sep, join } from 'path';
 import { tmpdir } from 'os';
+import rimrafCallback from 'rimraf';
 
 const exec = promisify(execCallback);
+const rimraf = (filepath) => new Promise((resolve, reject) => {
+    rimrafCallback(filepath, {}, (error) => {
+        if (error) {
+            reject(error);
+        } else {
+            resolve();
+        }
+    });
+});
+
 const TMP_DIR = tmpdir() + sep;
 
 // TODO: swap this out to use environment-parser?
@@ -24,15 +35,29 @@ const requireEnv = (key) => {
 const GITHUB_USERNAME = requireEnv('GITHUB_USERNAME');
 const GITHUB_ACCESS_TOKEN = requireEnv('GITHUB_ACCESS_TOKEN');
 const GITHUB_SOURCES = requireEnv('GITHUB_SOURCES').split(' ');
-const GITHUB_REPO_BLACKLIST = (process.env.GITHUB_REPO_BLACKLIST || '').split(' ');
 // const AWS_BUCKET = requireEnv('AWS_BUCKET');
 // const AWS_ACCESS_KEY_ID = requireEnv('AWS_ACCESS_KEY_ID');
 // const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
 
-// List all repos from Github (belonging to the user specified by GH_USERNAME?) (what if I also want to backup some of my org repos?)
-
-// Create a personal access token at https://github.com/settings/tokens/new?scopes=repo
 const octokit = new Octokit({ auth: GITHUB_ACCESS_TOKEN });
+
+
+const processRepository = async ({clone_url, full_name}) => {
+    const hash = await getAllBranchesHash(full_name);
+
+    const filename = `github_${full_name.replaceAll('/', '_')}.bundle`;
+
+    const urlWithUsername = new URL(clone_url);
+    urlWithUsername.username = GITHUB_USERNAME;
+
+    return {
+        clone_url: urlWithUsername.toString(),
+        hash,
+        filename,
+        full_name,
+    };
+};
+
 
 const listRepos = async(source) => {
     const pieces = source.split('/');
@@ -44,34 +69,27 @@ const listRepos = async(source) => {
     if (response.status !== 200) {
         throw new Error(`Error downloading repo list for ${source}`);
     }
-    // TODO: honor the rate limit headers if you need to pull lots of data here
-    // TODO: pagination?
-    return response.data.map(({id, clone_url, full_name}) => ({id, clone_url, full_name}));
+    
+    return await Promise.all(response.data.map(processRepository));
 };
 
-const getBranches = async(full_name) => {
+const getAllBranchesHash = async(full_name) => {
     const response = await octokit.request(`GET /repos/${full_name}/branches`);
     if (response.status !== 200) {
         throw new Error(`Error fetching branch information for ${full_name}`);
     }
-    return response.data.map(respData => ({name: respData.name, hash: respData.commit.sha}));
-};
 
-const calculateRepoHash = (branchData) => {
-    if (branchData.length === 0) {
+    const branchHashes = response.data.map(respData => respData.commit.sha);
+    if (branchHashes.length === 0) {
         throw new Error('No branch data found');
     }
+
     const shaSum = createHash('sha256');
-    for (const branch of branchData) {
-        shaSum.update(branch.hash);
+    branchHashes.sort();
+    for (const hash of branchHashes) {
+        shaSum.update(hash);
     }
     return shaSum.digest('hex');
-};
-
-const addUsername = (original, username) => {
-    const url = new URL(original);
-    url.username = username;
-    return url.toString();
 };
 
 const main = async () => {
@@ -80,16 +98,6 @@ const main = async () => {
     for (const source of GITHUB_SOURCES) {
         const repos = await listRepos(source);
         allRepos = allRepos.concat(repos);
-    }
-
-    // Calculate a hash based on the hashes of every branch in the repo to see if there are any new commits
-    for (const repo of allRepos) {
-        const branches = await getBranches(repo.full_name);
-        const hash = calculateRepoHash(branches);
-        repo.hash = hash;
-
-        const filename = repo.full_name.replaceAll('/', '_') + '.bundle';
-        repo.filename = filename;
     }
 
     // {
@@ -116,19 +124,20 @@ const main = async () => {
     for (const repo of staleRepos) {
         const tmpDir = await fs.mkdtemp(TMP_DIR);
 
-        const url = addUsername(repo.clone_url, GITHUB_USERNAME);
-
-        console.log('ready to try', url);
-        const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
-        console.log('stdout:', stdout1);
-        console.log('stderr:', stderr1);
-        const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: join(tmpDir, 'repo')});
-        console.log('stdout:', stdout2);
-        console.log('stderr:', stderr2);
-        const { stdout: stdout3, stderr: stderr3 } = await exec(`ls -alFh`, {cwd: tmpDir});
-        console.log('stdout:', stdout3);
-        console.log('stderr:', stderr3);
-        // TODO: try/finally? Cleanup the temp directories
+        try {
+            console.log('ready to try', repo.clone_url);
+            const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${repo.clone_url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
+            console.log('stdout:', stdout1);
+            console.log('stderr:', stderr1);
+            const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: join(tmpDir, 'repo')});
+            console.log('stdout:', stdout2);
+            console.log('stderr:', stderr2);
+            const { stdout: stdout3, stderr: stderr3 } = await exec(`ls -alFh`, {cwd: tmpDir});
+            console.log('stdout:', stdout3);
+            console.log('stderr:', stderr3);
+        } finally {
+            await rimraf(tmpDir);
+        }
     }
       // List all files already in the bucket
       

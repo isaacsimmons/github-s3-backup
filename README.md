@@ -2,6 +2,8 @@
 
 TODO: S3 or cloud in the name? Do I care about the project name being unique?
 
+Generate a personal access token with the "repo" scope at https://github.com/settings/tokens/new?scopes=repo
+
 General motiviation.
 Data ownership etc.
 No persistent local space.
