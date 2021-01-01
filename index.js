@@ -68,6 +68,12 @@ const calculateRepoHash = (branchData) => {
     return shaSum.digest('hex');
 };
 
+const addUsername = (original, username) => {
+    const url = new URL(original);
+    url.username = username;
+    return url.toString();
+};
+
 const main = async () => {
     // Grab all visible repositories from the provided github sources
     let allRepos = [];
@@ -105,16 +111,15 @@ const main = async () => {
 
     // Filter down the repositories to only ones that need to be updated
     // TODO: this
-    const staleRepos = allRepos.slice(0, 3);
+    const staleRepos = allRepos.slice(7, 10);
 
     for (const repo of staleRepos) {
         const tmpDir = await fs.mkdtemp(TMP_DIR);
 
-        const url = new URL(repo.clone_url);
-        url.username = GITHUB_USERNAME;
+        const url = addUsername(repo.clone_url, GITHUB_USERNAME);
 
-        console.log('ready to try', url.toString());
-        const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${url.toString()} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
+        console.log('ready to try', url);
+        const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
         console.log('stdout:', stdout1);
         console.log('stderr:', stderr1);
         const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: join(tmpDir, 'repo')});
