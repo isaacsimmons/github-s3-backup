@@ -44,7 +44,7 @@ const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
 const octokit = new Octokit({ auth: GITHUB_ACCESS_TOKEN });
 const s3 = new AWS.S3({credentials: {accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY}});
 
-const s3Upload = async (bucketFilename, localFilename, hash) => 
+const s3Upload = (bucketFilename, localFilename, hash) => 
     new Promise((resolve, reject) => {
         const params = {
           Bucket: AWS_BUCKET,
@@ -52,9 +52,8 @@ const s3Upload = async (bucketFilename, localFilename, hash) =>
           Body: createReadStream(localFilename),
           ACL: 'private',
           ContentType: 'application/octet-stream',
-          Tagging: stringify({hash}),
+          Metadata: { githash: hash },
         };
-
 
         s3.upload(params, (err, data) => {
         if (err) {
@@ -64,6 +63,35 @@ const s3Upload = async (bucketFilename, localFilename, hash) =>
         }
       })
     });
+
+const s3List = () => 
+    new Promise((resolve, reject) => {
+        s3.listObjectsV2({ Bucket: AWS_BUCKET }, (err, data) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      })
+    });
+
+
+const s3Head = (key) => 
+new Promise((resolve, reject) => {
+    s3.headObject({Key: key, Bucket: AWS_BUCKET}, (err, data) => {
+        if (err) {
+            reject(err);
+        } else {
+            resolve(data);
+        }
+    });
+});
+
+
+const getS3Objects = async() => {
+    const data = await s3List();
+    return Promise.all(data.Contents.map(processS3Object));
+};
 
 const processRepository = async ({clone_url, full_name}) => {
     const hash = await getAllBranchesHash(full_name);
@@ -81,6 +109,13 @@ const processRepository = async ({clone_url, full_name}) => {
     };
 };
 
+const processS3Object = async ({Key}) => {
+    const data = await s3Head(Key);
+    return {
+        filename: Key,
+        hash: data.Metadata.githash,
+    };
+};
 
 const listRepos = async(source) => {
     const pieces = source.split('/');
@@ -123,26 +158,11 @@ const main = async () => {
         allRepos = allRepos.concat(repos);
     }
 
-    // {
-    //     id: 49146647,
-    //     clone_url: 'https://github.com/sharpspring/beacon.git',
-    //     full_name: 'sharpspring/beacon',
-    //     hash: '0c2422b861d393437f30c8620186f24c7d4599a8a4cc1ed9015c5093d802d100'
-    //   },
-    //   {
-    //     id: 49523236,
-    //     clone_url: 'https://github.com/sharpspring/strading.git',
-    //     full_name: 'sharpspring/strading',
-    //     hash: 'f706945f15b04014f20f9e880d96198cfbfc123f36a0e941f3467ba16b52a8de'
-    //   }
-    // ]
-
-
     // Grab all files currently in the S3 bucket and their hash metadata
+    const currentFiles = new Map((await getS3Objects()).map(({filename, hash}) => [filename, hash]));
 
     // Filter down the repositories to only ones that need to be updated
-    // TODO: this
-    const staleRepos = allRepos.slice(7, 10);
+    const staleRepos = allRepos.filter(({filename, hash}) => currentFiles.get(filename) !== hash);
 
     for (const repo of staleRepos) {
         const tmpDir = await fs.mkdtemp(TMP_DIR);
@@ -151,15 +171,9 @@ const main = async () => {
         try {
             console.log('ready to try', repo.clone_url);
             const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${repo.clone_url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
-            console.log('stdout:', stdout1);
-            console.log('stderr:', stderr1);
             const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: repoDir});
-            console.log('stdout:', stdout2);
-            console.log('stderr:', stderr2);
             await rimraf(repoDir);
             const { stdout: stdout3, stderr: stderr3 } = await exec(`ls -alFh`, {cwd: tmpDir});
-            console.log('stdout:', stdout3);
-            console.log('stderr:', stderr3);
 
             // Upload the bundle file and the hash metadata
             await s3Upload(repo.filename, join(tmpDir, repo.filename), repo.hash);
