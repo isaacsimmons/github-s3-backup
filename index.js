@@ -11,6 +11,7 @@ import { tmpdir } from 'os';
 import rimrafCallback from 'rimraf';
 import { stringify } from 'querystring';
 
+// Promisify a bunch of functions
 const exec = promisify(execCallback);
 const rimraf = (filepath) => new Promise((resolve, reject) => {
     rimrafCallback(filepath, {}, (error) => {
@@ -21,29 +22,6 @@ const rimraf = (filepath) => new Promise((resolve, reject) => {
         }
     });
 });
-
-const TMP_DIR = tmpdir() + sep;
-5
-// TODO: swap this out to use environment-parser?
-const requireEnv = (key) => {
-    const value = process.env[key];
-    if (!value) {
-        console.error('Missing required environment value: ' + key);
-        process.exit(1);
-    }
-    return value;
-};
-
-const GITHUB_USERNAME = requireEnv('GITHUB_USERNAME');
-const GITHUB_ACCESS_TOKEN = requireEnv('GITHUB_ACCESS_TOKEN');
-const GITHUB_SOURCES = requireEnv('GITHUB_SOURCES').split(' ');
-const AWS_BUCKET = requireEnv('AWS_BUCKET');
-const AWS_ACCESS_KEY_ID = requireEnv('AWS_ACCESS_KEY_ID');
-const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
-
-const octokit = new Octokit({ auth: GITHUB_ACCESS_TOKEN });
-const s3 = new AWS.S3({credentials: {accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY}});
-
 const s3Upload = (bucketFilename, localFilename, hash) => 
     new Promise((resolve, reject) => {
         const params = {
@@ -88,6 +66,29 @@ new Promise((resolve, reject) => {
 });
 
 
+
+// TODO: swap this out to use environment-parser?
+const requireEnv = (key) => {
+    const value = process.env[key];
+    if (!value) {
+        console.error('Missing required environment value: ' + key);
+        process.exit(1);
+    }
+    return value;
+};
+
+const GITHUB_USERNAME = requireEnv('GITHUB_USERNAME');
+const GITHUB_ACCESS_TOKEN = requireEnv('GITHUB_ACCESS_TOKEN');
+const AWS_BUCKET = requireEnv('AWS_BUCKET');
+const AWS_ACCESS_KEY_ID = requireEnv('AWS_ACCESS_KEY_ID');
+const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
+
+const TMP_DIR = tmpdir() + sep;
+
+const octokit = new Octokit({ auth: GITHUB_ACCESS_TOKEN });
+const s3 = new AWS.S3({credentials: {accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY}});
+
+
 const getS3Objects = async() => {
     const data = await s3List();
     return Promise.all(data.Contents.map(processS3Object));
@@ -117,18 +118,13 @@ const processS3Object = async ({Key}) => {
     };
 };
 
-const listRepos = async(source) => {
-    const pieces = source.split('/');
-    if (pieces.length !== 4 || pieces[0] !== '' || pieces[3] !== 'repos' || (pieces[1] !== 'users' && pieces[1] !== 'orgs')) {
-        throw new Error(`Invalid github repo source: ${source}`);
-    }
-6.
-    const response = await octokit.request(`GET ${source}`);
+const listRepos = async() => {
+    const response = await octokit.request(`GET /search/repositories?q=user%3A${GITHUB_USERNAME}`);
     if (response.status !== 200) {
         throw new Error(`Error downloading repo list for ${source}`);
     }
     
-    return await Promise.all(response.data.map(processRepository));
+    return await Promise.all(response.data.items.map(processRepository));
 };
 
 const getAllBranchesHash = async(full_name) => {
@@ -151,12 +147,8 @@ const getAllBranchesHash = async(full_name) => {
 };
 
 const main = async () => {
-    // Grab all visible repositories from the provided github sources
-    let allRepos = [];
-    for (const source of GITHUB_SOURCES) {
-        const repos = await listRepos(source);
-        allRepos = allRepos.concat(repos);
-    }
+    // Grab all visible repositories from the current user
+    const allRepos = await listRepos();
 
     // Grab all files currently in the S3 bucket and their hash metadata
     const currentFiles = new Map((await getS3Objects()).map(({filename, hash}) => [filename, hash]));
@@ -164,19 +156,23 @@ const main = async () => {
     // Filter down the repositories to only ones that need to be updated
     const staleRepos = allRepos.filter(({filename, hash}) => currentFiles.get(filename) !== hash);
 
+    console.log(`Found ${allRepos.length} repositories of which ${staleRepos.length} need new backups`);
+
     for (const repo of staleRepos) {
         const tmpDir = await fs.mkdtemp(TMP_DIR);
         const repoDir = join(tmpDir, 'repo');
+        const bundleFile = join(tmpDir, repo.filename);
 
         try {
-            console.log('ready to try', repo.clone_url);
-            const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${repo.clone_url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
-            const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: repoDir});
+            console.log(`Cloning ${repo.clone_url}...`);
+            await exec(`git clone --mirror --bare ${repo.clone_url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
+            console.log(`Creating bundle ${repo.filename}...`);
+            await exec(`git bundle create ${bundleFile} --all`, {cwd: repoDir});
             await rimraf(repoDir);
-            const { stdout: stdout3, stderr: stderr3 } = await exec(`ls -alFh`, {cwd: tmpDir});
 
             // Upload the bundle file and the hash metadata
-            await s3Upload(repo.filename, join(tmpDir, repo.filename), repo.hash);
+            console.log(`Uploading to s3://${AWS_BUCKET}/${repo.filename}...`)
+            await s3Upload(repo.filename, bundleFile, repo.hash);
         } finally {
             await rimraf(tmpDir);
         }
@@ -186,3 +182,5 @@ const main = async () => {
 };
 
 main();
+
+
