@@ -1,5 +1,3 @@
-'use strict';
-
 import {Octokit} from '@octokit/core';
 import {createHash} from 'crypto';
 import {promises as fs, createReadStream} from 'fs';
@@ -32,40 +30,35 @@ const listGithubRepos = async () => {
     throw new Error(`Error downloading repo list for ${source}`);
   }
 
-  const promises = response.data.items.map(
-      async ({clone_url: cloneUrl, full_name: fullName}) => {
-        const hash = await getAllBranchesHash(fullName);
+  return await Promise.all(response.data.items.map(
+      async ({clone_url: url, full_name: name}) => {
+        const hash = await getAllBranchesHash(name);
 
-        const filename = `github_${fullName.replaceAll('/', '_')}.bundle`;
-
-        const urlWithUsername = new URL(cloneUrl);
+        const urlWithUsername = new URL(url);
         urlWithUsername.username = settings.GITHUB_USERNAME;
 
         return {
-          clone_url: urlWithUsername.toString(),
+          cloneUrl: urlWithUsername.toString(),
           hash,
-          filename,
-          full_name: fullName,
+          filename: `github_${name.replaceAll('/', '_')}.bundle`,
         };
       },
-  );
-
-  return await Promise.all(promises);
+  ));
 };
 
-const getAllBranchesHash = async (fullName) => {
-  const response = await octokit.request(`GET /repos/${fullName}/branches`);
+const getAllBranchesHash = async (name) => {
+  const response = await octokit.request(`GET /repos/${name}/branches`);
   if (response.status !== 200) {
-    throw new Error(`Error fetching branch information for ${fullName}`);
+    throw new Error(`Error fetching branch information for ${name}`);
   }
 
   const branchHashes = response.data.map((respData) => respData.commit.sha);
   if (branchHashes.length === 0) {
     throw new Error('No branch data found');
   }
+  branchHashes.sort();
 
   const shaSum = createHash('sha256');
-  branchHashes.sort();
   for (const hash of branchHashes) {
     shaSum.update(hash);
   }
@@ -88,15 +81,14 @@ const main = async () => {
   );
   console.log(`${staleRepos.length} repositories need new backups`);
 
-
   for (const repo of staleRepos) {
     const tmpDir = await fs.mkdtemp(TMP_DIR);
     const repoDir = join(tmpDir, 'repo');
     const bundleFile = join(tmpDir, repo.filename);
 
     try {
-      console.log(`Cloning ${repo.clone_url}...`);
-      await exec(`git clone --mirror --bare ${repo.clone_url} repo`, {
+      console.log(`Cloning ${repo.cloneUrl}...`);
+      await exec(`git clone --mirror --bare ${repo.cloneUrl} repo`, {
         cwd: tmpDir,
         env: {
           GIT_ASKPASS: '/app/.git-askpass',
@@ -121,8 +113,6 @@ const main = async () => {
       await rimraf(tmpDir);
     }
   }
-
-  console.log('Done');
 };
 
 main();
