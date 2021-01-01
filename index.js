@@ -1,13 +1,15 @@
 'use strict';
 
 import { Octokit } from '@octokit/core';
+import AWS from 'aws-sdk';
 import { createHash } from 'crypto';
-import { promises as fs } from 'fs';
+import { promises as fs, createReadStream } from 'fs';
 import {promisify } from 'util';
 import { exec as execCallback } from 'child_process';
 import { sep, join } from 'path';
 import { tmpdir } from 'os';
 import rimrafCallback from 'rimraf';
+import { stringify } from 'querystring';
 
 const exec = promisify(execCallback);
 const rimraf = (filepath) => new Promise((resolve, reject) => {
@@ -21,7 +23,7 @@ const rimraf = (filepath) => new Promise((resolve, reject) => {
 });
 
 const TMP_DIR = tmpdir() + sep;
-
+5
 // TODO: swap this out to use environment-parser?
 const requireEnv = (key) => {
     const value = process.env[key];
@@ -35,12 +37,33 @@ const requireEnv = (key) => {
 const GITHUB_USERNAME = requireEnv('GITHUB_USERNAME');
 const GITHUB_ACCESS_TOKEN = requireEnv('GITHUB_ACCESS_TOKEN');
 const GITHUB_SOURCES = requireEnv('GITHUB_SOURCES').split(' ');
-// const AWS_BUCKET = requireEnv('AWS_BUCKET');
-// const AWS_ACCESS_KEY_ID = requireEnv('AWS_ACCESS_KEY_ID');
-// const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
+const AWS_BUCKET = requireEnv('AWS_BUCKET');
+const AWS_ACCESS_KEY_ID = requireEnv('AWS_ACCESS_KEY_ID');
+const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
 
 const octokit = new Octokit({ auth: GITHUB_ACCESS_TOKEN });
+const s3 = new AWS.S3({credentials: {accessKeyId: AWS_ACCESS_KEY_ID, secretAccessKey: AWS_SECRET_ACCESS_KEY}});
 
+const s3Upload = async (bucketFilename, localFilename, hash) => 
+    new Promise((resolve, reject) => {
+        const params = {
+          Bucket: AWS_BUCKET,
+          Key: bucketFilename,
+          Body: createReadStream(localFilename),
+          ACL: 'private',
+          ContentType: 'application/octet-stream',
+          Tagging: stringify({hash}),
+        };
+
+
+        s3.upload(params, (err, data) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      })
+    });
 
 const processRepository = async ({clone_url, full_name}) => {
     const hash = await getAllBranchesHash(full_name);
@@ -64,7 +87,7 @@ const listRepos = async(source) => {
     if (pieces.length !== 4 || pieces[0] !== '' || pieces[3] !== 'repos' || (pieces[1] !== 'users' && pieces[1] !== 'orgs')) {
         throw new Error(`Invalid github repo source: ${source}`);
     }
-
+6.
     const response = await octokit.request(`GET ${source}`);
     if (response.status !== 200) {
         throw new Error(`Error downloading repo list for ${source}`);
@@ -123,31 +146,27 @@ const main = async () => {
 
     for (const repo of staleRepos) {
         const tmpDir = await fs.mkdtemp(TMP_DIR);
+        const repoDir = join(tmpDir, 'repo');
 
         try {
             console.log('ready to try', repo.clone_url);
             const { stdout: stdout1, stderr: stderr1 } = await exec(`git clone --mirror --bare ${repo.clone_url} repo`, {cwd: tmpDir, env: { GIT_ASKPASS: '/app/.git-askpass', GITHUB_ACCESS_TOKEN }});
             console.log('stdout:', stdout1);
             console.log('stderr:', stderr1);
-            const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: join(tmpDir, 'repo')});
+            const { stdout: stdout2, stderr: stderr2 } = await exec(`git bundle create ${join('..', repo.filename)} --all`, {cwd: repoDir});
             console.log('stdout:', stdout2);
             console.log('stderr:', stderr2);
+            await rimraf(repoDir);
             const { stdout: stdout3, stderr: stderr3 } = await exec(`ls -alFh`, {cwd: tmpDir});
             console.log('stdout:', stdout3);
             console.log('stderr:', stderr3);
+
+            // Upload the bundle file and the hash metadata
+            await s3Upload(repo.filename, join(tmpDir, repo.filename), repo.hash);
         } finally {
             await rimraf(tmpDir);
         }
     }
-      // List all files already in the bucket
-      
-      
-      // Calculate the list of repos to backup
-      
-      // git clone --mirror
-      // git bundle --all
-      // Maybe just use the archive/zip option? (or, you know, not)
-      // upload new version
       
       console.log('Done');
 };
