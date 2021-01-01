@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "backup": "node src/index.js"
+    "backup": "node src/index.js",
+    "lint": "eslint src/*.js"
   },
   "keywords": [
     "git",
@@ -21,5 +22,9 @@
     "@octokit/core": "^3.2.4",
     "aws-sdk": "^2.819.0",
     "rimraf": "^3.0.2"
+  },
+  "devDependencies": {
+    "eslint": "^7.16.0",
+    "eslint-config-google": "^0.14.0"
   }
 }
