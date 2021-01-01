@@ -9,7 +9,6 @@ import { exec as execCallback } from 'child_process';
 import { sep, join } from 'path';
 import { tmpdir } from 'os';
 import rimrafCallback from 'rimraf';
-import { stringify } from 'querystring';
 
 // Promisify a bunch of functions
 const exec = promisify(execCallback);
@@ -22,16 +21,8 @@ const rimraf = (filepath) => new Promise((resolve, reject) => {
         }
     });
 });
-const s3Upload = (bucketFilename, localFilename, hash) => 
+const s3Upload = (params) => 
     new Promise((resolve, reject) => {
-        const params = {
-          Bucket: AWS_BUCKET,
-          Key: bucketFilename,
-          Body: createReadStream(localFilename),
-          ACL: 'private',
-          ContentType: 'application/octet-stream',
-          Metadata: { githash: hash },
-        };
 
         s3.upload(params, (err, data) => {
         if (err) {
@@ -42,9 +33,9 @@ const s3Upload = (bucketFilename, localFilename, hash) =>
       })
     });
 
-const s3List = () => 
+const s3List = (params) => 
     new Promise((resolve, reject) => {
-        s3.listObjectsV2({ Bucket: AWS_BUCKET }, (err, data) => {
+        s3.listObjectsV2(params, (err, data) => {
         if (err) {
           reject(err);
         } else {
@@ -54,9 +45,9 @@ const s3List = () =>
     });
 
 
-const s3Head = (key) => 
+const s3Head = (params) => 
 new Promise((resolve, reject) => {
-    s3.headObject({Key: key, Bucket: AWS_BUCKET}, (err, data) => {
+    s3.headObject(params, (err, data) => {
         if (err) {
             reject(err);
         } else {
@@ -90,7 +81,7 @@ const s3 = new AWS.S3({credentials: {accessKeyId: AWS_ACCESS_KEY_ID, secretAcces
 
 
 const getS3Objects = async() => {
-    const data = await s3List();
+    const data = await s3List({ Bucket: AWS_BUCKET });
     return Promise.all(data.Contents.map(processS3Object));
 };
 
@@ -111,7 +102,7 @@ const processRepository = async ({clone_url, full_name}) => {
 };
 
 const processS3Object = async ({Key}) => {
-    const data = await s3Head(Key);
+    const data = await s3Head({Key, Bucket: AWS_BUCKET});
     return {
         filename: Key,
         hash: data.Metadata.githash,
@@ -172,7 +163,14 @@ const main = async () => {
 
             // Upload the bundle file and the hash metadata
             console.log(`Uploading to s3://${AWS_BUCKET}/${repo.filename}...`)
-            await s3Upload(repo.filename, bundleFile, repo.hash);
+            await s3Upload({
+                Bucket: AWS_BUCKET,
+                Key: repo.filename,
+                Body: createReadStream(bundleFile),
+                ACL: 'private',
+                ContentType: 'application/octet-stream',
+                Metadata: { githash: repo.hash },
+              });
         } finally {
             await rimraf(tmpDir);
         }
@@ -182,5 +180,3 @@ const main = async () => {
 };
 
 main();
-
-
