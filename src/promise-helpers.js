@@ -23,6 +23,7 @@ const s3 = new AWS.S3({
     accessKeyId: settings.AWS_ACCESS_KEY_ID,
     secretAccessKey: settings.AWS_SECRET_ACCESS_KEY,
   },
+  region: settings.AWS_REGION,
 });
 
 export const s3Upload = (params) =>
