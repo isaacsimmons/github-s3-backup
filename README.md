@@ -14,10 +14,9 @@ The basic process goes something like:
 1) Pull all branches and their current sha hashes, combine them to create a repository version fingerprint
 1) Scan all bundles currently in the bucket and pull the last recorded version fingerprint from the metadata
 1) Calculate which repositories need to be backed up and then:
-  1) Clone it into a temp directory
-  1) Create a git bundle
-  1) Upload the bundle
-  1) Delete any tempoary files
+    1) Clone it into a temp directory
+    1) Create a git bundle
+    1) Upload the bundle
 
 This tool is stateless except for the configuration and the backups themselves.
 
@@ -50,9 +49,7 @@ If you add an environment value for `HEALTHCHECK_PING_URL`, it will perform a si
 
 ## Running Locally
 
-1) Ensure that you have the following dependencies installed:
-  * Node 15
-  * git
+1) Ensure that you have the following dependencies installed: node 15, git
 1) Complete the configuration steps above.
 1) Run `yarn install` to get dependencies from npm.
 1) Run `yarn backup-local` to trigger the script.
@@ -78,8 +75,9 @@ Probably need to build and publish the image to ECR.
 
 This only works with Github currently, but could probably be extended to scrape from other git hosting providers without too much effort.
 Likewise, it has only been configured to backup the files to Amazon S3, but again wouldn't be difficult to extend with additional storage backends.
-Only the commits themselves are covered by this.
-If you need Pull Requests, Issues, Wikis, etc backed up as well, then support for those would need to be added.
+
+Only the commits themselves are backed up.
+If you care about Pull Requests, Issues, Wikis, etc then support for those would need to be added.
 
 The fetching of object metadata from S3 and branch information from github are both un-batched and issue one request per repository.
 In the case that you have a very large number of repositories, this may incur a signifcant network or time cost.
