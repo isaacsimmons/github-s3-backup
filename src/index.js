@@ -1,8 +1,10 @@
-import {Octokit} from '@octokit/core';
 import {createHash} from 'crypto';
 import {promises as fs, createReadStream} from 'fs';
 import {sep, join} from 'path';
 import {tmpdir} from 'os';
+import https from 'https';
+
+import {Octokit} from '@octokit/core';
 
 import {exec, rimraf, s3List, s3Upload, s3Head} from './promise-helpers.js';
 import {settings} from './settings.js';
@@ -66,11 +68,11 @@ const getAllBranchesHash = async (name) => {
 };
 
 const main = async () => {
-  // Grab all visible repositories from the current user
+  // Grab all repositories from Github
   const allRepos = await listGithubRepos();
   console.log(`Found ${allRepos.length} repositories`);
 
-  // Grab all files currently in the S3 bucket and their hash metadata
+  // Grab all files currently in the S3 bucket
   const currentFiles = new Map((await listS3Objects()).map(
       ({filename, hash}) => [filename, hash],
   ));
@@ -87,6 +89,7 @@ const main = async () => {
     const bundleFile = join(tmpDir, repo.filename);
 
     try {
+      // Clone the repo
       console.log(`Cloning ${repo.cloneUrl}...`);
       await exec(`git clone --mirror --bare ${repo.cloneUrl} repo`, {
         cwd: tmpDir,
@@ -95,11 +98,13 @@ const main = async () => {
           GITHUB_ACCESS_TOKEN: settings.GITHUB_ACCESS_TOKEN,
         },
       });
+
+      // Create a git bundle
       console.log(`Creating bundle ${repo.filename}...`);
       await exec(`git bundle create ${bundleFile} --all`, {cwd: repoDir});
       await rimraf(repoDir);
 
-      // Upload the bundle file and the hash metadata
+      // Upload the bundle to S3
       console.log(`Uploading to s3://${AWS_BUCKET}/${repo.filename}...`);
       await s3Upload({
         Bucket: settings.AWS_BUCKET,
@@ -113,6 +118,10 @@ const main = async () => {
       await rimraf(tmpDir);
     }
   }
+
+  https.get(settings.HEALTHCHECK_PING_URL).on('error', (err) => {
+    throw new Error('Healthcheck Ping Failed: ' + err);
+  });
 };
 
 main();

@@ -13,6 +13,7 @@ const GITHUB_ACCESS_TOKEN = requireEnv('GITHUB_ACCESS_TOKEN');
 const AWS_BUCKET = requireEnv('AWS_BUCKET');
 const AWS_ACCESS_KEY_ID = requireEnv('AWS_ACCESS_KEY_ID');
 const AWS_SECRET_ACCESS_KEY = requireEnv('AWS_SECRET_ACCESS_KEY');
+const HEALTHCHECK_PING_URL = requireEnv('HEALTHCHECK_PING_URL');
 
 export const settings = {
   GITHUB_USERNAME,
@@ -20,4 +21,5 @@ export const settings = {
   AWS_BUCKET,
   AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY,
+  HEALTHCHECK_PING_URL,
 };

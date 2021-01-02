@@ -1,12 +1,12 @@
 {
-  "name": "github-backup",
+  "name": "github-s3-backup",
   "version": "1.0.0",
   "description": "Backup a users's github repos to AWS S3",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "backup": "node src/index.js",
+    "backup-local": "node -r dotenv/config src/index.js",
     "lint": "eslint src/*.js"
   },
   "keywords": [
@@ -24,6 +24,7 @@
     "rimraf": "^3.0.2"
   },
   "devDependencies": {
+    "dotenv": "^8.2.0",
     "eslint": "^7.16.0",
     "eslint-config-google": "^0.14.0"
   }
