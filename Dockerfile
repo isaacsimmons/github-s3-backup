@@ -12,4 +12,4 @@ RUN yarn install --production --frozen-lockfile
 
 COPY . /app/
 
-CMD [ "yarn", "run", "backup" ]
+CMD [ "yarn", "backup" ]

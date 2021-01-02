@@ -119,9 +119,11 @@ const main = async () => {
     }
   }
 
-  https.get(settings.HEALTHCHECK_PING_URL).on('error', (err) => {
-    throw new Error('Healthcheck Ping Failed: ' + err);
-  });
+  if (settings.HEALTHCHECK_PING_URL) {
+    https.get(settings.HEALTHCHECK_PING_URL).on('error', (err) => {
+      throw new Error('Healthcheck Ping Failed: ' + err);
+    });
+  }
 };
 
 main();
