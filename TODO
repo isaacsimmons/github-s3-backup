@@ -1,6 +1,6 @@
-AWS/S3 pluggable?
+Make storage backend (AWS/S3) pluggable?
 Support a repository name blacklist?
-Repository filters out forks? filter to private/public only? on a per-source basis?
-Backup org repos as well?
+Repository filters out forks? filter to private/public only?
+Backup org repos as well? Or starred repos?
 Install just the s3 subset of the aws-sdk?
 Incremental would be nice, but meh -- your repos shouldn't be huge anyways?

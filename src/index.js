@@ -105,7 +105,7 @@ const main = async () => {
       await rimraf(repoDir);
 
       // Upload the bundle to S3
-      console.log(`Uploading to s3://${AWS_BUCKET}/${repo.filename}...`);
+      console.log(`Uploading to s3://${settings.AWS_BUCKET}/${repo.filename}...`);
       await s3Upload({
         Bucket: settings.AWS_BUCKET,
         Key: repo.filename,
