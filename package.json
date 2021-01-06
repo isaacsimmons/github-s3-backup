@@ -21,6 +21,7 @@
   "dependencies": {
     "@octokit/core": "^3.2.4",
     "aws-sdk": "^2.820.0",
+    "environment-parser": "^1.0.1",
     "rimraf": "^3.0.2"
   },
   "devDependencies": {

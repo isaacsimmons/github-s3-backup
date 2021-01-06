@@ -321,6 +321,11 @@ enquirer@^2.3.5:
   dependencies:
     ansi-colors "^4.1.1"
 
+environment-parser@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/environment-parser/-/environment-parser-1.0.1.tgz#6f7017b8def2a264769f43e1f98c4897ec756109"
+  integrity sha512-NnI5bGHsSIq/OolWXt3hTgsiPgQm/6PCSBKHuhZE1QncEbPikDOurf5oGZzfAf1Yr4O01e5PFw7pUEVPTZfdNw==
+
 escape-string-regexp@^1.0.5:
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-1.0.5.tgz"
