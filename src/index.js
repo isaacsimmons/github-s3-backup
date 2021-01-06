@@ -94,7 +94,7 @@ const main = async () => {
       await exec(`git clone --mirror --bare ${repo.cloneUrl} repo`, {
         cwd: tmpDir,
         env: {
-          GIT_ASKPASS: '/app/.git-askpass',
+          GIT_ASKPASS: join(process.env.PWD, '.git-askpass'),
           GITHUB_ACCESS_TOKEN: settings.GITHUB_ACCESS_TOKEN,
         },
       });
