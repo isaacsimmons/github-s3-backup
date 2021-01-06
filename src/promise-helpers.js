@@ -18,6 +18,10 @@ export const rimraf = (filepath) => new Promise((resolve, reject) => {
   });
 });
 
+AWS.config.update({
+  correctClockSkew: true,
+});
+
 const s3 = new AWS.S3({
   credentials: {
     accessKeyId: settings.AWS_ACCESS_KEY_ID,
