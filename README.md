@@ -49,27 +49,39 @@ If you add an environment value for `HEALTHCHECK_PING_URL`, it will perform a si
 
 ## Running Locally
 
+1) Clone this project locally
 1) Ensure that you have the following dependencies installed: node 15, git
-1) Complete the configuration steps above.
-1) Run `yarn install` to get dependencies from npm.
-1) Run `yarn backup-local` to trigger the script.
+1) Complete the configuration steps above
+1) Run `yarn install` to get dependencies from npm
+1) Run `yarn backup-local` to trigger the script
 
 Maybe think about putting the last step in a cron if you want it to happen automatically.
 
 ## Running in Docker
 
 1) Ensure that you have docker installed
-1) Complete the configuration steps above.
-1) Run `./run-in-docker.sh` to build and run the docker image.
+1) Create a local `.env` file based on the [template](.env.template) in this repository
+1) Run `docker run --env-file .env --name ghbu --rm isaacsimmons/github-s3-backup`
 
 Maybe think about putting the last step in a cron if you want it to happen automatically.
-Depending on your permissions, you may need to launch `run-in-docker` with sudo or as root in order for it to be able to communicate with docker.
+Depending on your permissions, you may need to launch the docker command with sudo or as root.
 
 ## Running in the Cloud
 
 TODO: this?
 Instrucitons for setting it up as an AWS Lambda Cron or something.
 Probably need to build and publish the image to ECR.
+
+# Publishing
+
+(Really just a note for myself about publishing)
+(TODO: connect docker hub with github to that this is automatic)
+
+```bash
+docker login
+docker build . -t isaacsimmons/github-s3-backup
+docker push isaacsimmons/github-s3-backup
+```
 
 # Limitations
 
