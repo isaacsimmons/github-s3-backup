@@ -22,7 +22,17 @@ This tool is stateless except for the configuration and the backups themselves.
 
 # Configuration
 
-Copy `.env.template` to `.env` and fill in all of the values.
+```
+GITHUB_USERNAME=
+GITHUB_ACCESS_TOKEN=
+
+AWS_REGION=
+AWS_BUCKET=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+HEALTHCHECK_PING_URL=
+```
 
 ## Github
 
@@ -50,6 +60,7 @@ If you add an environment value for `HEALTHCHECK_PING_URL`, it will perform a si
 ## Running Locally
 
 1) Clone this project locally
+1) Copy `.env.template` to `.env` and fill in the configuration options
 1) Ensure that you have the following dependencies installed: node 15, git
 1) Complete the configuration steps above
 1) Run `yarn install` to get dependencies from npm
