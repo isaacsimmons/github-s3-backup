@@ -61,27 +61,30 @@ Maybe think about putting the last step in a cron if you want it to happen autom
 
 1) Ensure that you have docker installed
 1) Create a local `.env` file based on the [template](.env.template) in this repository
-1) Run `docker run --env-file .env --name ghbu --rm isaacsimmons/github-s3-backup`
+1) Run `docker run --env-file .env --rm isaacsimmons/github-s3-backup`
 
 Maybe think about putting the last step in a cron if you want it to happen automatically.
 Depending on your permissions, you may need to launch the docker command with sudo or as root.
 
-## Running in the Cloud
+## Cron Example From my Raspberry Pi
 
-TODO: this?
-Instrucitons for setting it up as an AWS Lambda Cron or something.
-Probably need to build and publish the image to ECR.
+```0 2 * * * docker run --env-file /home/pi/github-s3-backup/.env --rm isaacsimmons/github-s3-backup:arm```
 
 # Publishing
 
 (Really just a note for myself about publishing)
-(TODO: connect docker hub with github to that this is automatic)
+
+TODO: README on DockerHub
 
 ```bash
 docker login
 docker build . -t isaacsimmons/github-s3-backup
+docker build . -f Dockerfile.arm isaacsimmons/github-s3-backup:arm
 docker push isaacsimmons/github-s3-backup
+docker push isaacsimmons/github-s3-backup:arm
 ```
+
+But also, just setup automated builds on docker hub.
 
 # Limitations
 
