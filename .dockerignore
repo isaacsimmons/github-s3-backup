@@ -1,4 +1,8 @@
 node_modules
 .env
 .env.template
-run.sh
+.editorconfig
+Dockerfile
+Dockerfile.arm
+.eslintrc.json
+.git
