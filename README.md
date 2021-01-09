@@ -79,7 +79,7 @@ TODO: README on DockerHub
 ```bash
 docker login
 docker build . -t isaacsimmons/github-s3-backup
-docker build . -f Dockerfile.arm isaacsimmons/github-s3-backup:arm
+docker build . -f Dockerfile.arm -t isaacsimmons/github-s3-backup:arm
 docker push isaacsimmons/github-s3-backup
 docker push isaacsimmons/github-s3-backup:arm
 ```
